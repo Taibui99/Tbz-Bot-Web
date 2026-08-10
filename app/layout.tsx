@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import './live-pages.css'
+import './perf-scheduler.css'
 
 export const metadata: Metadata = {
   title: 'TBZ-BOT // Control Center',
