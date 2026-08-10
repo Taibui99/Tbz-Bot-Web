@@ -1,20 +1,14 @@
-/* Sprint 3 — performance layer */
-.ambient{animation:none!important;filter:blur(72px)!important;opacity:.22!important;transform:none!important}
-.glass-card,.nav-item,.primary,.secondary,.icon-btn,.search-trigger,.settings{will-change:auto}
+/* Sprint 3 — lightweight Liquid Glass performance layer */
+.ambient{animation:none!important;filter:none!important;opacity:.10!important;transform:none!important}
+.ambient-a,.ambient-b,.ambient-c{filter:none!important;opacity:.08!important}
+.glass,.glass-card,.glass-soft{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.glass{background:linear-gradient(145deg,rgba(25,32,55,.92),rgba(9,14,27,.88))!important}
+.glass-card{background:linear-gradient(145deg,rgba(29,36,61,.90),rgba(10,15,29,.86))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.075),0 12px 32px rgba(0,0,0,.18)!important}
+.glass-soft{background:rgba(255,255,255,.035)!important}
+.glass-highlight{opacity:.55}
+.glass-card:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 15px 38px rgba(0,0,0,.22)!important}
 .chart-wrap{contain:layout paint}
 .terminal-body{contain:content;overflow:auto;overscroll-behavior:contain}
-@media (max-width:900px){
-  .glass{backdrop-filter:blur(18px) saturate(130%);-webkit-backdrop-filter:blur(18px) saturate(130%)}
-  .glass-card{backdrop-filter:blur(16px) saturate(125%);-webkit-backdrop-filter:blur(16px) saturate(125%)}
-  .glass-soft{backdrop-filter:blur(12px) saturate(120%);-webkit-backdrop-filter:blur(12px) saturate(120%)}
-  .ambient{filter:blur(55px)!important;opacity:.16!important}
-}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
-}
-@supports not ((backdrop-filter:blur(1px))){
-  .glass{background:rgba(13,19,35,.94)}
-  .glass-card{background:rgba(15,21,39,.94)}
-  .glass-soft{background:rgba(19,25,42,.9)}
-}
-.panel{contain:layout style}
+.nav-item,.primary,.secondary,.icon-btn,.search-trigger,.settings{will-change:auto}
+@media(max-width:900px){.ambient{opacity:.05!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition-duration:.001ms!important}}
