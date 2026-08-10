@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Bot, CalendarClock, CheckCircle2, CloudSun, FileClock, MapPin, MessageSquare, RefreshCw, Save, Settings2, Users, Wifi, XCircle } from 'lucide-react'
+import { Activity, Bot, CalendarClock, CheckCircle2, CloudSun, FileClock, MapPin, MessageSquare, RefreshCw, Save, Settings2, Users, Wifi, X, XCircle } from 'lucide-react'
 
 type Status = {
   bot_running: boolean
