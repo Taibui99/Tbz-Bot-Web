@@ -1,11 +1,7 @@
 # TBZ-BOT Web
 
-Modern dashboard for TBZ-BOT.
+## Sprint 1
+A premium dark realtime console for TBZ-BOT. The first sprint is intentionally frontend-only: realistic dashboard data, responsive shell, live-looking activity stream, status cards and polished motion. Bot/API integration comes later.
 
-## Direction
-- Premium dark futuristic UI
-- Realtime bot status and logs
-- Conversations, scheduler, weather, AI and settings
-- Responsive desktop/mobile experience
-
-Built as a standalone web frontend so the bot service remains independent.
+### Run
+`npm install && npm run dev`
