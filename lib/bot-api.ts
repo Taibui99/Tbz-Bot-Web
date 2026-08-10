@@ -74,3 +74,5 @@ export async function getBotHealth(): Promise<BotHealth> {
     return empty("offline");
   }
 }
+
+// Keep this module intentionally server-side: it is consumed by Next.js API routes.
