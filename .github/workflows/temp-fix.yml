@@ -1,0 +1,35 @@
+name: Temporary build fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'fix: import missing X icon'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix missing X icon import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/page.tsx')
+          s = p.read_text()
+          old = 'FileClock, MapPin, MessageSquare, RefreshCw, Save, Settings2, Users, Wifi, XCircle'
+          new = 'FileClock, MapPin, MessageSquare, RefreshCw, Save, Settings2, Users, Wifi, X, XCircle'
+          if old not in s:
+              raise SystemExit('Expected import text not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          rm .github/workflows/temp-fix.yml
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/page.tsx .github/workflows/temp-fix.yml
+          git commit -m 'fix: import missing X icon'
+          git push
