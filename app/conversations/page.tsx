@@ -9,7 +9,7 @@ interface Conversation {
   sent_at?: string;
   duration?: number;
   user_text?: string;
-  bot_text?: string;
+  bot_reply?: string;
 }
 
 export default function ConversationsPage() {
@@ -41,7 +41,7 @@ export default function ConversationsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter((item) =>
-      [item.display_name, item.chat_id, item.user_text, item.bot_text].some((v) =>
+      [item.display_name, item.chat_id, item.user_text, item.bot_reply].some((v) =>
         String(v ?? "").toLowerCase().includes(q),
       ),
     );
@@ -73,7 +73,7 @@ export default function ConversationsPage() {
               <span className="badge">{item.type === "photo" ? "ẢNH" : "TEXT"}</span>
             </div>
             <div className="message user-message">{item.user_text || "[không có nội dung]"}</div>
-            <div className="message bot-message">{item.bot_text || "[không có phản hồi]"}</div>
+            <div className="message bot-message">{item.bot_reply || "[không có phản hồi]"}</div>
             <div className="conversation-foot"><span>{item.sent_at || ""}</span>{typeof item.duration === "number" ? <span>{item.duration}s response</span> : null}</div>
           </article>
         ))}
