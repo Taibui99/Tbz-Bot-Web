@@ -1,0 +1,20 @@
+/* Sprint 3 — performance layer */
+.ambient{animation:none!important;filter:blur(72px)!important;opacity:.22!important;transform:none!important}
+.glass-card,.nav-item,.primary,.secondary,.icon-btn,.search-trigger,.settings{will-change:auto}
+.chart-wrap{contain:layout paint}
+.terminal-body{contain:content;overflow:auto;overscroll-behavior:contain}
+@media (max-width:900px){
+  .glass{backdrop-filter:blur(18px) saturate(130%);-webkit-backdrop-filter:blur(18px) saturate(130%)}
+  .glass-card{backdrop-filter:blur(16px) saturate(125%);-webkit-backdrop-filter:blur(16px) saturate(125%)}
+  .glass-soft{backdrop-filter:blur(12px) saturate(120%);-webkit-backdrop-filter:blur(12px) saturate(120%)}
+  .ambient{filter:blur(55px)!important;opacity:.16!important}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+@supports not ((backdrop-filter:blur(1px))){
+  .glass{background:rgba(13,19,35,.94)}
+  .glass-card{background:rgba(15,21,39,.94)}
+  .glass-soft{background:rgba(19,25,42,.9)}
+}
+.panel{contain:layout style}
