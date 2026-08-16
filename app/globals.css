@@ -1,10 +1,11 @@
-/* ============================================================
+﻿/* ============================================================
    TBZ-BOT CONTROL CENTER — liquid glass (Apple-style, dark)
    Performance-first:
-   - Background hoàn toàn TĨNH (gradient + 2 glow), không có blob
-     animate, không có SVG noise fullscreen → backdrop-filter rẻ.
-   - Chỉ những bề mặt tương tác mới có blur; tránh blur chồng blur.
-   - Animation chỉ dùng transform/opacity (GPU), không animate filter.
+   - Background hoàn toàn TĨNH (gradient + glow), không blob/noise.
+   - KHÔNG dùng backdrop-filter: blur() — mỗi lớp blur là 1 layer
+     GPU, giật trên GPU tích hợp. Hiệu ứng glass được vẽ bằng
+     gradient + viền + inset highlight + shadow (gần như miễn phí).
+   - Animation chỉ dùng transform/opacity (GPU).
    ============================================================ */
 
 :root {
@@ -103,8 +104,6 @@ select {
   gap: 6px;
   border-right: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
   z-index: 20;
 }
 
@@ -246,8 +245,6 @@ select {
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   font-size: 12px;
   font-weight: 600;
   color: var(--text-2);
@@ -304,9 +301,6 @@ select {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel-strong), var(--panel));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 20px;
   transition: border-color 0.15s, transform 0.15s;
 }
@@ -370,9 +364,6 @@ select {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel-strong), var(--panel));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 0.15s, border-color 0.15s;
 }
 .stat-card:hover {
@@ -438,8 +429,6 @@ select {
   font-size: 13px;
   font-weight: 600;
   transition: background 0.15s, transform 0.15s, border-color 0.15s;
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 .btn:hover {
   background: var(--panel-hover);
@@ -586,9 +575,6 @@ select {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel-strong), var(--panel));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  padding: 14px 16px;
   transition: border-color 0.15s;
 }
 .conv-card:hover {
@@ -670,8 +656,6 @@ select {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: rgba(2, 4, 9, 0.75);
-  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -734,9 +718,6 @@ select {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel-strong), var(--panel));
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -802,9 +783,7 @@ select {
   padding: 12px 18px;
   border-radius: 14px;
   border: 1px solid var(--border-strong);
-  background: rgba(16, 19, 29, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(16, 19, 29, 0.95);
   box-shadow: var(--shadow);
   font-size: 13px;
   font-weight: 600;
@@ -870,8 +849,6 @@ select {
   border-radius: 22px;
   border: 1px solid var(--border-strong);
   background: linear-gradient(180deg, var(--panel-strong), var(--panel));
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
@@ -910,6 +887,15 @@ select {
 }
 .page-enter {
   animation: fadeSlide 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
+  }
+  .pill .pdot {
+    animation: none;
+  }
 }
 
 /* ---------- Service rows ---------- */

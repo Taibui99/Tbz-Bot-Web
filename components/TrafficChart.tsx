@@ -34,7 +34,7 @@ export default function TrafficChart({ data, total }: Props) {
               labelStyle={{ color: 'var(--text-3)', marginBottom: 4 }}
               formatter={(value) => [`${value} tin`, 'Tin nhắn']}
             />
-            <Area type="monotone" dataKey="count" stroke="#8b7cf6" strokeWidth={2.5} fill="url(#trafficFill)" activeDot={{ r: 4 }} />
+            <Area type="monotone" dataKey="count" stroke="#8b7cf6" strokeWidth={2.5} fill="url(#trafficFill)" activeDot={{ r: 4 }} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
