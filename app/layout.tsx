@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import './live-pages.css'
-import './perf-scheduler.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'TBZ-BOT // Control Center',
@@ -9,5 +8,11 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="vi"><body>{children}</body></html>
+  return (
+    <html lang="vi">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  )
 }

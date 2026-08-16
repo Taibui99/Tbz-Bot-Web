@@ -1,40 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { botFetch, guardAdmin } from '@/lib/server'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
-function botUrl() {
-  const base = process.env.BOT_API_URL?.replace(/\/$/, "");
-  if (!base) throw new Error("BOT_API_URL is not configured");
-  return `${base}/api/settings`;
+export async function GET(req: NextRequest) {
+  const guard = guardAdmin(req)
+  if (guard) return guard
+  const res = await botFetch('/api/settings', { timeoutMs: 6000 })
+  const data = await res.json().catch(() => ({}))
+  return NextResponse.json(data, { status: res.status })
 }
 
-export async function GET() {
-  try {
-    const response = await fetch(botUrl(), { cache: "no-store" });
-    const body = await response.text();
-    return new NextResponse(body, {
-      status: response.status,
-      headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-    });
-  } catch (error) {
-    return NextResponse.json({ error: "Bot API unavailable", detail: String(error) }, { status: 502 });
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const response = await fetch(botUrl(), {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: await request.text(),
-      cache: "no-store",
-    });
-    const body = await response.text();
-    return new NextResponse(body, {
-      status: response.status,
-      headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-    });
-  } catch (error) {
-    return NextResponse.json({ error: "Bot API unavailable", detail: String(error) }, { status: 502 });
-  }
+export async function PUT(req: NextRequest) {
+  const guard = guardAdmin(req)
+  if (guard) return guard
+  const body = await req.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: 'Body phải là JSON' }, { status: 400 })
+  const res = await botFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timeoutMs: 8000 })
+  const data = await res.json().catch(() => ({}))
+  return NextResponse.json(data, { status: res.status })
 }

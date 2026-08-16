@@ -1,88 +1,208 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Bot, CalendarClock, CheckCircle2, CloudSun, FileClock, MessageSquare, RefreshCw, Save, Settings2, Users, Wifi, X, XCircle, Zap } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Bot,
+  CalendarClock,
+  FileClock,
+  KeyRound,
+  LayoutDashboard,
+  Lock,
+  MessageSquare,
+  RefreshCw,
+  Settings2,
+  ShieldCheck,
+  Sticker,
+} from 'lucide-react'
+import { api, ApiAuthError, setToken } from '@/lib/client'
+import type { Overview } from '@/lib/types'
+import { ToastHost, type Toast, type ToastKind } from '@/components/ui'
+import OverviewTab from '@/components/Overview'
+import ConversationsTab from '@/components/Conversations'
+import LogsTab from '@/components/Logs'
+import StickersTab from '@/components/Stickers'
+import SchedulerTab from '@/components/Scheduler'
+import SettingsTab from '@/components/Settings'
 
-type Status = { bot_running: boolean; bot_error: string | null; message_count: number; text_count: number; photo_count: number; error_count: number; unique_users: number; avg_response_seconds: number; last_message_at: string | null; uptime_seconds: number }
-type Period = { start: string; end: string; subject: string }
-type Schedule = Record<string, Period[]>
-type Settings = { owner_chat_id: string | null; morning_greeting: { enabled: boolean; time: string }; location: { name: string; lat: number | null; lon: number | null }; schedule: Schedule }
-type Conversation = { display_name: string; chat_id: string; type: string; user_text: string; bot_reply: string; sent_at: string; received_at: string; responded_at: string; duration: number }
-type Tab = 'overview' | 'conversations' | 'logs' | 'settings'
+type Tab = 'overview' | 'conversations' | 'logs' | 'stickers' | 'scheduler' | 'settings'
 
-const days: [string, string][] = [['Mon','Thứ Hai'],['Tue','Thứ Ba'],['Wed','Thứ Tư'],['Thu','Thứ Năm'],['Fri','Thứ Sáu'],['Sat','Thứ Bảy'],['Sun','Chủ Nhật']]
-const emptySchedule = (): Schedule => Object.fromEntries(days.map(([d]) => [d, []]))
-const dateText = (v: string | null | undefined) => { if (!v) return 'Chưa có'; const n = Number(v); const d = Number.isFinite(n) && n > 1000000000 ? new Date(n * 1000) : new Date(v); return Number.isNaN(d.getTime()) ? v : d.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}) }
-const duration = (s: number) => !Number.isFinite(s) ? '—' : s < 1 ? `${Math.round(s*1000)}ms` : `${s.toFixed(1)}s`
+const NAV: { id: Tab; label: string; Icon: typeof LayoutDashboard }[] = [
+  { id: 'overview', label: 'Tổng quan', Icon: LayoutDashboard },
+  { id: 'conversations', label: 'Hội thoại', Icon: MessageSquare },
+  { id: 'logs', label: 'Live Logs', Icon: FileClock },
+  { id: 'stickers', label: 'Stickers', Icon: Sticker },
+  { id: 'scheduler', label: 'Scheduler', Icon: CalendarClock },
+  { id: 'settings', label: 'Cài đặt', Icon: Settings2 },
+]
 
-async function json<T>(url: string, init?: RequestInit): Promise<T> { const r = await fetch(url, { cache:'no-store', ...init }); if (!r.ok) throw Error(await r.text()); return r.json() }
+const TAB_TITLES: Record<Tab, { title: string; sub: string }> = {
+  overview: { title: 'Tổng quan', sub: 'Bảng điều khiển bot' },
+  conversations: { title: 'Hội thoại', sub: 'Lịch sử trò chuyện thật từ bot' },
+  logs: { title: 'Live Logs', sub: 'Luồng log realtime từ process' },
+  stickers: { title: 'Stickers', sub: 'Thư viện sticker mà bot có thể gửi' },
+  scheduler: { title: 'Scheduler', sub: 'Chào buổi sáng & thời khóa biểu' },
+  settings: { title: 'Cài đặt', sub: 'Chủ bot, vị trí & công cụ' },
+}
 
 export default function Home() {
-  const [status,setStatus] = useState<Status|null>(null)
-  const [settings,setSettings] = useState<Settings|null>(null)
-  const [conversations,setConversations] = useState<Conversation[]>([])
-  const [logs,setLogs] = useState<string[]>([])
-  const [tab,setTab] = useState<Tab>('overview')
-  const [loading,setLoading] = useState(true)
-  const [error,setError] = useState('')
-  const [saving,setSaving] = useState(false)
-  const [saveMessage,setSaveMessage] = useState('')
+  const qc = useQueryClient()
+  const [tab, setTab] = useState<Tab>('overview')
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [refreshing, setRefreshing] = useState(false)
+  const [authFailed, setAuthFailed] = useState(false)
+  const toastId = useRef(0)
 
-  const loadStatus = useCallback(async()=>{ try { setStatus(await json<Status>('/api/status')); setError('') } catch(e){ setError(`Không thể kết nối bot: ${String(e)}`) } },[])
-  const loadSettings = useCallback(async()=>{ try { const d:any=await json('/api/settings'); setSettings({owner_chat_id:d.owner_chat_id??null,morning_greeting:d.morning_greeting??{enabled:true,time:'06:00'},location:d.location??{name:'',lat:null,lon:null},schedule:{...emptySchedule(),...(d.schedule??{})}}) } catch(e){ setError(`Không tải được cài đặt: ${String(e)}`) } },[])
-  const loadConversations = useCallback(async()=>{ try { const d:any=await json('/api/conversations'); setConversations(d.conversations??[]) } catch {} },[])
-  const refresh = useCallback(async()=>{ setLoading(true); await Promise.all([loadStatus(),loadSettings(),loadConversations()]); setLoading(false) },[loadStatus,loadSettings,loadConversations])
+  const notify = useCallback((kind: ToastKind, text: string) => {
+    const id = ++toastId.current
+    setToasts((prev) => [...prev, { id, kind, text }])
+    window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
+  }, [])
 
-  useEffect(()=>{ refresh() },[refresh])
-  useEffect(()=>{
-    let cancelled=false
-    const poll=async()=>{ if(cancelled || document.hidden) return; await loadStatus(); if(tab==='overview'||tab==='conversations') await loadConversations() }
-    const id=window.setInterval(poll,15000)
-    const onVisibility=()=>{ if(!document.hidden) poll() }
-    document.addEventListener('visibilitychange',onVisibility)
-    return()=>{ cancelled=true; clearInterval(id); document.removeEventListener('visibilitychange',onVisibility) }
-  },[loadStatus,loadConversations,tab])
-  useEffect(()=>{
-    if(tab!=='logs') return
-    const source=new EventSource('/api/logs')
-    const onMessage=(e:MessageEvent)=>setLogs(prev=>{ const next=prev.length>=80?prev.slice(-79):prev; return [...next,e.data] })
-    source.addEventListener('message',onMessage)
-    return()=>source.close()
-  },[tab])
+  const overview = useQuery<Overview>({
+    queryKey: ['overview'],
+    queryFn: async () => {
+      try {
+        return await api<Overview>('/api/overview')
+      } catch (e) {
+        if (e instanceof ApiAuthError) {
+          setAuthFailed(true)
+          throw e
+        }
+        throw e
+      }
+    },
+    refetchInterval: 30_000,
+  })
 
-  const uptime=useMemo(()=>{ const s=status?.uptime_seconds??0; const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m` },[status])
-  const setTabAndTop=(next:Tab)=>{ setTab(next); window.scrollTo({top:0,behavior:'auto'}) }
-  async function saveSettings(){ if(!settings) return; setSaving(true); setSaveMessage(''); try { await json('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)}); setSaveMessage('Đã lưu trực tiếp vào bot ✓'); window.setTimeout(()=>setSaveMessage(''),3000) } catch(e){ setSaveMessage(`Lỗi: ${String(e)}`) } finally { setSaving(false) } }
-  function updatePeriod(day:string,i:number,field:keyof Period,value:string){ if(!settings) return; const schedule={...settings.schedule,[day]:[...(settings.schedule[day]??[])]}; schedule[day][i]={...schedule[day][i],[field]:value}; setSettings({...settings,schedule}) }
-  function addPeriod(day:string){ if(!settings) return; setSettings({...settings,schedule:{...settings.schedule,[day]:[...(settings.schedule[day]??[]),{start:'',end:'',subject:''}]}}) }
-  function removePeriod(day:string,i:number){ if(!settings) return; setSettings({...settings,schedule:{...settings.schedule,[day]:(settings.schedule[day]??[]).filter((_,n)=>n!==i)}}) }
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await qc.refetchQueries({ queryKey: ['overview'], type: 'active' })
+    } finally {
+      setRefreshing(false)
+    }
+  }, [qc])
 
-  const nav:[Tab,string,any][]=[['overview','Tổng quan',Activity],['conversations','Hội thoại',MessageSquare],['logs','Live Logs',FileClock],['settings','Scheduler',Settings2]]
-  return <main className="app-shell">
-    <div className="ambient ambient-a"/><div className="ambient ambient-b"/><div className="ambient ambient-c"/><div className="noise"/>
-    <aside className="sidebar glass"><div className="brand"><div className="brand-mark"><Bot size={21}/></div><div><b>TBZ-BOT</b><span>CONTROL CENTER</span></div></div><div className="nav-label">WORKSPACE</div><nav>{nav.map(([id,label,Icon])=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>setTabAndTop(id)}><Icon size={17}/><span>{label}</span>{id==='conversations'&&conversations.length>0&&<i>{conversations.length}</i>}</button>)}</nav><div className="sidebar-bottom"><div className="mini-status glass-soft"><span className="dot"/><div><b>{status?.bot_running?'Bot đang online':'Bot đang offline'}</b><small>Production</small></div><span className="online-ring"/></div></div></aside>
-    <section className="content"><header className="topbar glass"><div className="crumb"><span>TBZ-BOT</span><b>/</b><strong>{tab==='overview'?'Tổng quan':tab==='conversations'?'Hội thoại':tab==='logs'?'Live Logs':'Scheduler & Cài đặt'}</strong></div><div className="top-actions"><span className="live"><span className="dot"/>{status?.bot_running?'LIVE':'OFFLINE'}</span><span className="clock">{new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</span><button className="icon-btn" onClick={refresh} aria-label="Làm mới"><RefreshCw size={15}/></button><div className="avatar">TB</div></div></header>
-      <div className="page">{error&&<div className="alert"><XCircle size={15}/>{error}</div>}{tab==='overview'&&<Overview status={status} uptime={uptime} conversations={conversations} settings={settings} onSettings={()=>setTabAndTop('settings')}/>} {tab==='conversations'&&<ConversationPage conversations={conversations}/>} {tab==='logs'&&<LogsPage logs={logs}/>} {tab==='settings'&&settings&&<SettingsPage settings={settings} setSettings={setSettings} updatePeriod={updatePeriod} addPeriod={addPeriod} removePeriod={removePeriod} save={saveSettings} saving={saving} message={saveMessage}/>} {loading&&<div className="loading">Đang đồng bộ dữ liệu thật từ bot…</div>}</div>
-    </section>
-  </main>
+  const online = overview.data?.connected ?? false
+  const offlineError = overview.data?.error ?? null
+
+  if (authFailed) {
+    return <LoginScreen notify={notify} onSuccess={() => { setAuthFailed(false); qc.invalidateQueries({ queryKey: ['overview'] }) }} />
+  }
+
+  const current = TAB_TITLES[tab]
+
+  return (
+    <div className="app">
+      <aside className="rail">
+        <div className="rail-logo">
+          <Bot size={22} />
+        </div>
+        {NAV.map(({ id, label, Icon }) => (
+          <button key={id} className={`rail-item ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)} aria-label={label}>
+            <Icon size={18} />
+            <span className="rail-tip">{label}</span>
+          </button>
+        ))}
+        <div className="rail-bottom">
+          <div className={`rail-dot ${online ? '' : 'offline'}`} />
+        </div>
+      </aside>
+
+      <main className="content">
+        <header className="topbar">
+          <div className="topbar-title">
+            <h1>{current.title}</h1>
+            <p>{current.sub}</p>
+          </div>
+          <div className="topbar-actions">
+            <span className={`pill ${online ? 'online' : 'offline'}`}>
+              <span className={`pdot ${online ? '' : 'off'}`} />
+              {online ? 'LIVE' : 'OFFLINE'}
+            </span>
+            <button className={`icon-btn ${refreshing ? 'spin' : ''}`} onClick={refresh} aria-label="Làm mới">
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </header>
+
+        {offlineError && !online && (
+          <div className="alert">
+            <span>Bot API đang ngoài mạng</span>
+            <span style={{ opacity: 0.7, fontWeight: 400 }}>{offlineError}</span>
+          </div>
+        )}
+
+        {overview.isLoading && !overview.data ? (
+          <div className="center-box">
+            <div className="spinner" />
+            <span>Đang đồng bộ dữ liệu thật từ bot…</span>
+          </div>
+        ) : (
+          <div className="page-enter">
+            {tab === 'overview' && <OverviewTab overview={overview.data} isLoading={overview.isFetching} onNavigate={setTab} notify={notify} />}
+            {tab === 'conversations' && <ConversationsTab conversations={overview.data?.conversations ?? []} notify={notify} />}
+            {tab === 'logs' && <LogsTab notify={notify} />}
+            {tab === 'stickers' && <StickersTab settings={overview.data?.settings ?? null} notify={notify} />}
+            {tab === 'scheduler' && <SchedulerTab settings={overview.data?.settings ?? null} notify={notify} />}
+            {tab === 'settings' && <SettingsTab settings={overview.data?.settings ?? null} notify={notify} />}
+          </div>
+        )}
+      </main>
+
+      <ToastHost toasts={toasts} />
+    </div>
+  )
 }
 
-function Overview({status,uptime,conversations,settings,onSettings}:{status:Status|null;uptime:string;conversations:Conversation[];settings:Settings|null;onSettings:()=>void}){
-  const traffic=useMemo(()=>{const now=new Date();return Array.from({length:7},(_,i)=>{const d=new Date(now);d.setHours(0,0,0,0);d.setDate(now.getDate()-(6-i));const key=d.toDateString();const count=conversations.reduce((n,c)=>{const x=Number(c.received_at);const cd=Number.isFinite(x)&&x>1000000000?new Date(x*1000):new Date(c.received_at);return n+(cd.toDateString()===key?1:0)},0);return {label:['CN','T2','T3','T4','T5','T6','T7'][d.getDay()],count}})},[conversations])
-  const max=Math.max(1,...traffic.map(x=>x.count)), scheduleTime=settings?.morning_greeting.time??'06:00'
-  const responseBars=conversations.slice(0,8).reverse().map(c=>Math.max(8,Math.min(100,c.duration*12)))
-  const health=status?Math.max(0,Math.min(100,100-status.error_count*10)):0
-  return <>
-    <div className="hero-row"><div><div className="eyebrow"><span className="hero-live">SYSTEM LIVE</span> TBZ-BOT CONTROL CENTER</div><h1>Everything is <em>{status?.bot_running?'running.':'offline.'}</em></h1><p>Điều khiển bot, automation và các dịch vụ kết nối trong một không gian duy nhất.</p></div><div className="hero-actions"><button className="secondary" onClick={onSettings}><Settings2 size={14}/> Cấu hình</button><button className="primary" onClick={onSettings}><Zap size={14}/> Bot controls</button></div></div>
-    <div className="stats-grid"><Stat icon={Wifi} value={status?.bot_running?'ONLINE':'OFFLINE'} label="SYSTEM STATUS" meta={status?.bot_running?'All systems operational':'Bot process unavailable'}/><Stat icon={Activity} value={uptime} label="UPTIME" meta="Live process duration"/><Stat icon={MessageSquare} value={String(status?.message_count??'—')} label="MESSAGES" meta={`${status?.text_count??0} text · ${status?.photo_count??0} ảnh`}/><Stat icon={Users} value={String(status?.unique_users??'—')} label="USERS" meta={`${conversations.length} hội thoại lưu trữ`}/></div>
-    <div className="analytics-grid"><section className="panel glass-card"><div className="panel-head"><div><div className="panel-kicker">ACTIVITY / 07 DAYS</div><h2>Message traffic</h2></div><div className="select">Live data</div></div><div className="chart-wrap"><svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="none"><polyline fill="none" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={traffic.map((x,i)=>`${i*120},${170-x.count/max*120}`).join(' ')}/>{traffic.map((x,i)=><circle key={i} cx={i*120} cy={170-x.count/max*120} r="3" fill="#a78bfa"/>)}</svg></div><div className="chart-legend"><span><i className="legend-purple"/>Messages</span><strong>{status?.message_count??0} total</strong></div><div className="traffic-days">{traffic.map((x,i)=><span key={i}>{x.label}</span>)}</div></section><section className="panel glass-card compact-chart"><div className="panel-head"><div><div className="panel-kicker">PERFORMANCE</div><h2>Response health</h2></div></div><div className="bar-chart">{(responseBars.length?responseBars:[12,12,12,12,12,12,12,12]).map((h,i)=><i key={i} style={{height:`${h}%`}}/>)}</div><div className="performance"><div><span>Avg. latency</span><b>{duration(status?.avg_response_seconds??0)}</b><small>Current average</small></div><div><span>Success rate</span><b>{status?`${Math.max(0,Math.min(100,100-(status.error_count/Math.max(1,status.message_count))*100)).toFixed(1)}%`:'—'}</b><small>Live errors</small></div></div></section></div>
-    <div className="main-grid"><section className="panel glass-card"><div className="panel-head"><div><div className="panel-kicker">SYSTEM</div><h2>Bot activity</h2></div><button className="filter-btn" onClick={onSettings}>Scheduler →</button></div><div className="terminal"><div className="terminal-body"><div className="terminal-line">Bot status: {status?.bot_running?'ONLINE':'OFFLINE'}</div><div className="terminal-line">Messages: {status?.message_count??0} · Users: {status?.unique_users??0}</div><div className="terminal-line">Last activity: {dateText(status?.last_message_at)}</div><div className="terminal-line">Average response: {duration(status?.avg_response_seconds??0)}</div><div className="terminal-line">Errors: {status?.error_count??0}</div></div></div></section><section className="panel glass-card health-panel"><div className="panel-head"><div><div className="panel-kicker">INFRASTRUCTURE</div><h2>Service status</h2></div><span className="hero-live">LIVE</span></div><div className="service-list"><Service icon={<Wifi size={14}/>} name="Zalo Gateway" meta={status?.bot_running?'Connected':'Offline'} ok={!!status?.bot_running}/><Service icon={<CalendarClock size={14}/>} name="Morning Scheduler" meta={settings?.morning_greeting.enabled?`Armed · ${scheduleTime}`:'Disabled'} ok={!!settings?.morning_greeting.enabled}/><Service icon={<CloudSun size={14}/>} name="Weather API" meta={settings?.location.name?`Configured · ${settings.location.name}`:'Not configured'} ok={!!settings?.location.name}/></div><div className="health-total"><span>Overall health</span><b>{health}%</b><div><i style={{width:`${health}%`}}/></div></div></section></div>
-    <div className="bottom-grid"><section className="panel glass-card"><div className="panel-kicker">AUTOMATION</div><h2>Next automation</h2><div className="next-auto"><strong>{scheduleTime}</strong><span>{settings?.morning_greeting.enabled?'AM':'OFF'}</span><div><b>Morning greeting</b><small>{settings?.location.name||'Weather not configured'} · Zalo</small></div></div></section><section className="panel glass-card"><div className="panel-kicker">TODAY</div><h2>Quick metrics</h2><div className="quick-metrics"><div><b>{status?.message_count??0}</b><small>messages</small></div><div><b>{status?.text_count??0}</b><small>text</small></div><div><b>{status?.error_count??0}</b><small>errors</small></div></div></section><section className="panel glass-card"><div className="panel-kicker">CONTROL CENTER</div><h2>Bot actions</h2><div className="control-actions"><button onClick={onSettings}><Settings2 size={14}/> Scheduler</button></div></section></div>
-  </>
+function LoginScreen({ notify, onSuccess }: { notify: (k: ToastKind, t: string) => void; onSuccess: () => void }) {
+  const [token, setTokenValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    if (!token.trim()) return
+    setBusy(true)
+    try {
+      setToken(token.trim())
+      const data = await api<Overview>('/api/overview')
+      if (data) {
+        onSuccess()
+      }
+    } catch {
+      notify('err', 'Sai hoặc thiếu ADMIN_TOKEN — thử lại')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="login-wrap">
+      <form
+        className="login-card"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+      >
+        <div className="rail-logo" style={{ margin: 0 }}>
+          <ShieldCheck size={24} />
+        </div>
+        <h1>Đăng nhập quản trị</h1>
+        <p style={{ color: 'var(--text-2)', margin: 0, fontSize: 13 }}>
+          Web này đã bật ADMIN_TOKEN. Nhập token giống với biến môi trường <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: 6 }}>ADMIN_TOKEN</code> để tiếp tục.
+        </p>
+        <div className="field">
+          <span>ADMIN_TOKEN</span>
+          <input className="input" type="password" value={token} onChange={(e) => setTokenValue(e.target.value)} placeholder="••••••••" autoFocus />
+        </div>
+        <button className="btn btn-primary" disabled={busy || !token.trim()}>
+          {busy ? <span className="spinner" /> : <KeyRound size={15} />}
+          {busy ? 'Đang kiểm tra…' : 'Vào control center'}
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12 }}>
+          <Lock size={13} />
+          Token được giữ trong session này, không lưu xuống đĩa.
+        </div>
+      </form>
+    </div>
+  )
 }
-
-function Stat({icon:Icon,value,label,meta}:{icon:any;value:string;label:string;meta:string}){return <div className="stat-card glass-card"><div className="stat-top"><div className="stat-icon"><Icon size={16}/></div></div><div className="stat-value">{value}</div><div className="stat-label">{label}</div><div className="stat-meta">{meta}</div></div>}
-function Service({icon,name,meta,ok}:{icon:React.ReactNode;name:string;meta:string;ok:boolean}){return <div className="service-row"><div className="service-icon">{icon}</div><div><b>{name}</b><small>{meta}</small></div><span className={ok?'service-ok':'service-off'}>{ok?'ready':'offline'}</span></div>}
-function ConversationPage({conversations}:{conversations:Conversation[]}){return <><div className="page-header"><div><div className="eyebrow">MESSAGING / LIVE</div><h1>Hội thoại</h1><p>Danh sách hội thoại thật từ bot Zalo.</p></div></div><div className="conversation-list">{conversations.length?conversations.map((c,i)=><article className="conversation-card glass-card" key={`${c.chat_id}-${c.received_at}-${i}`}><div className="conversation-head"><b>{c.display_name||c.chat_id}</b><span className="badge">{c.type||'user'}</span></div><div className="message user-message">{c.user_text||'[ảnh]'}</div><div className="message bot-message">{c.bot_reply||'[không có phản hồi text]'}</div><div className="conversation-foot"><span>{dateText(c.received_at)}</span><span>{duration(c.duration)}</span></div></article>):<div className="toolbar-card glass-card muted">Chưa có hội thoại.</div>}</div></>}
-function LogsPage({logs}:{logs:string[]}){return <><div className="page-header"><div><div className="eyebrow">SYSTEM / STREAM</div><h1>Live Logs</h1><p>Luồng log realtime từ bot đang chạy.</p></div></div><div className="terminal-card glass-card"><div className="terminal-head"><span/><span/><span/><label>tbz-bot / production</label></div><div className="terminal-body">{logs.length?logs.map((l,i)=><div className="terminal-line" key={`${i}-${l}`}>{l}</div>):<div className="terminal-empty">Đang chờ log realtime…</div>}</div></div></>}
-function SettingsPage({settings,setSettings,updatePeriod,addPeriod,removePeriod,save,saving,message}:{settings:Settings;setSettings:(s:Settings)=>void;updatePeriod:(d:string,i:number,f:keyof Period,v:string)=>void;addPeriod:(d:string)=>void;removePeriod:(d:string,i:number)=>void;save:()=>void;saving:boolean;message:string}){return <><div className="page-header"><div><div className="eyebrow">AUTOMATION / CONFIG</div><h1>Scheduler & Cài đặt</h1><p>Mọi thay đổi được ghi trực tiếp vào bot.</p></div><button className="primary" onClick={save} disabled={saving}><Save size={14}/>{saving?'Đang lưu…':'Lưu cài đặt'}</button></div>{message&&<div className="toolbar-card glass-card" style={{color:'#86eab4'}}><CheckCircle2 size={15}/>{message}</div>}<div className="settingsGrid"><section className="panel glass-card"><div className="panel-head"><div><div className="panel-kicker">BOT</div><h2>Owner</h2></div></div><label className="muted">Owner chat ID<input className="search-input" value={settings.owner_chat_id??''} onChange={e=>setSettings({...settings,owner_chat_id:e.target.value||null})} placeholder="Tự động ghi nhận"/></label></section><section className="panel glass-card"><div className="panel-head"><div><div className="panel-kicker">AUTOMATION</div><h2>Morning greeting</h2></div></div><div className="toggleRow"><label className="switch"><input type="checkbox" checked={settings.morning_greeting.enabled} onChange={e=>setSettings({...settings,morning_greeting:{...settings.morning_greeting,enabled:e.target.checked}})}/><span/></label><b>{settings.morning_greeting.enabled?'Đang bật':'Đang tắt'}</b><input className="search-input" style={{width:110}} type="time" value={settings.morning_greeting.time} onChange={e=>setSettings({...settings,morning_greeting:{...settings.morning_greeting,time:e.target.value}})}/></div><p className="muted">Weather chỉ gọi một lần tại thời điểm gửi.</p></section></div><section className="panel glass-card" style={{marginTop:10}}><div className="panel-head"><div><div className="panel-kicker">WEATHER</div><h2>Địa điểm</h2></div></div><div className="form3"><label className="muted">Tên<input className="search-input" value={settings.location.name} onChange={e=>setSettings({...settings,location:{...settings.location,name:e.target.value}})}/></label><label className="muted">Latitude<input className="search-input" type="number" value={settings.location.lat??''} onChange={e=>setSettings({...settings,location:{...settings.location,lat:e.target.value===''?null:Number(e.target.value)}})}/></label><label className="muted">Longitude<input className="search-input" type="number" value={settings.location.lon??''} onChange={e=>setSettings({...settings,location:{...settings.location,lon:e.target.value===''?null:Number(e.target.value)}})}/></label></div></section><section className="panel glass-card" style={{marginTop:10}}><div className="panel-head"><div><div className="panel-kicker">SCHOOL</div><h2>Thời khóa biểu</h2></div></div>{days.map(([day,label])=><div className="day" key={day}><b>{label}</b>{(settings.schedule[day]??[]).map((p,i)=><div className="period" key={`${day}-${i}`}><input className="search-input" type="time" value={p.start} onChange={e=>updatePeriod(day,i,'start',e.target.value)}/><span>→</span><input className="search-input" type="time" value={p.end} onChange={e=>updatePeriod(day,i,'end',e.target.value)}/><input className="search-input" value={p.subject} placeholder="Môn học" onChange={e=>updatePeriod(day,i,'subject',e.target.value)}/><button className="remove" onClick={()=>removePeriod(day,i)}><X size={14}/></button></div>)}<button className="add" onClick={()=>addPeriod(day)}>+ Thêm tiết</button></div>)}</section></>}
