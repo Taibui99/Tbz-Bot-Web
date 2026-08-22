@@ -80,3 +80,15 @@ export type TestSendResponse = {
   photo_url?: string
   error?: string
 }
+
+export type ChatInfo = {
+  chat_id: string
+  type: 'GROUP' | 'PRIVATE'
+  name: string
+  last_sender: string | null
+  message_count: number
+  is_owner: boolean
+  first_seen: number | null
+  last_seen: number | null
+  member_names: string[]
+}

@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Activity, Bell, Bot, CloudSun, MessageSquare, RefreshCw, Send, Settings2, Timer, Trash2, Users, Wifi, Zap } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Activity, Bell, Bot, CloudSun, MessageSquare, Mic, RefreshCw, Send, Settings2, Timer, Trash2, Users, Wifi, Zap } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/client'
-import type { Overview, TestSendResponse } from '@/lib/types'
+import type { ChatInfo, Overview, TestSendResponse } from '@/lib/types'
 import { StatCard, Panel, fmtDate, fmtDuration, fmtUptime, type ToastKind } from '@/components/ui'
 
 const TrafficChart = dynamic(() => import('@/components/TrafficChart'), { ssr: false, loading: () => <div className="center-box" style={{ height: 180 }}><div className="spinner" /></div> })
@@ -47,10 +47,30 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
   const successRate = status && status.message_count > 0 ? Math.max(0, Math.min(100, 100 - (status.error_count / status.message_count) * 100)) : 100
   const health = status ? Math.max(0, Math.min(100, successRate)) : 0
 
+  // Sổ địa chỉ chat (ACCOUNT riêng / NHÓM) + đích gửi thử đang chọn
+  const [targetChat, setTargetChat] = useState('')
+  const chatsQuery = useQuery({
+    queryKey: ['chats'],
+    queryFn: () => api<{ chats: ChatInfo[] }>('/api/chats'),
+    refetchInterval: 60_000,
+  })
+  const chats = useMemo(() => chatsQuery.data?.chats ?? [], [chatsQuery.data])
+  useEffect(() => {
+    if (!targetChat && chats.length) {
+      setTargetChat((chats.find((c) => c.is_owner) ?? chats[0]).chat_id)
+    }
+  }, [chats, targetChat])
+
   const testSend = useMutation({
-    mutationFn: () => api<TestSendResponse>('/api/test-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'text', text: testText }) }),
-    onSuccess: (d) => notify(d.ok ? 'ok' : 'err', d.ok ? 'Đã gửi tin thử về chủ bot ✓' : `Gửi thất bại: ${d.error ?? 'lỗi không rõ'}`),
+    mutationFn: () => api<TestSendResponse>('/api/test-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'text', text: testText, chat_id: targetChat || undefined }) }),
+    onSuccess: (d) => notify(d.ok ? 'ok' : 'err', d.ok ? `Đã gửi tin thử ✓ (${d.chat_id})` : `Gửi thất bại: ${d.error ?? 'lỗi không rõ'}`),
     onError: (e) => notify('err', `Lỗi gửi thử: ${String(e)}`),
+  })
+
+  const voiceSend = useMutation({
+    mutationFn: () => api<TestSendResponse>('/api/test-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'voice', text: testText, chat_id: targetChat || undefined }) }),
+    onSuccess: (d) => notify(d.ok ? 'ok' : 'err', d.ok ? 'Đã gửi voice thử ✓' : `Voice thất bại: ${d.error ?? 'Zalo có thể không hỗ trợ voice cho đích này'}`),
+    onError: (e) => notify('err', `Lỗi gửi voice: ${String(e)}`),
   })
 
   const resetOwner = useMutation({
@@ -95,12 +115,24 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
 
         <Panel kicker="QUICK ACTIONS" title="Điều khiển nhanh">
           <div className="field">
-            <span>Gửi tin thử về chủ bot</span>
+            <span>Gửi thử tới</span>
+            <select className="input" value={targetChat} onChange={(e) => setTargetChat(e.target.value)} disabled={chats.length === 0}>
+              {chats.length === 0 && <option value="">(Chưa có ai nhắn bot)</option>}
+              {chats.map((c) => (
+                <option key={c.chat_id} value={c.chat_id}>
+                  [{c.type === 'GROUP' ? 'Nhóm' : 'User'}] {c.name}{c.is_owner ? ' ★ owner' : ''}
+                </option>
+              ))}
+            </select>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input className="input" value={testText} onChange={(e) => setTestText(e.target.value)} />
-              <button className="btn btn-primary" onClick={() => testSend.mutate()} disabled={testSend.isPending || !testText.trim()}>
+              <input className="input" value={testText} onChange={(e) => setTestText(e.target.value)} placeholder="Nội dung text hoặc voice" />
+              <button className="btn btn-primary" onClick={() => testSend.mutate()} disabled={testSend.isPending || !testText.trim() || !targetChat}>
                 {testSend.isPending ? <span className="spinner" /> : <Send size={14} />}
-                Gửi
+                Tin
+              </button>
+              <button className="btn" onClick={() => voiceSend.mutate()} disabled={voiceSend.isPending || !testText.trim() || !targetChat}>
+                {voiceSend.isPending ? <span className="spinner" /> : <Mic size={14} />}
+                Voice
               </button>
             </div>
           </div>
@@ -141,6 +173,28 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
           </div>
         </Panel>
       </div>
+
+      <Panel kicker="DIRECTORY" title={`Sổ địa chỉ · ${chats.length} chat`} className="page-enter" right={chatsQuery.isFetching ? <div className="spinner" /> : <span className="pill">{chats.filter((c) => c.type === 'GROUP').length} nhóm · {chats.filter((c) => c.type !== 'GROUP').length} user</span>}>
+        {chats.length === 0 ? (
+          <div className="empty">Chưa có account/nhóm nào. Bot tự ghi nhận vào sổ khi có người nhắn hoặc nhắn trong nhóm.</div>
+        ) : (
+          chats.map((c) => (
+            <div key={c.chat_id} className="service-row">
+              <div className="service-icon">{c.type === 'GROUP' ? <Users size={14} /> : <Bot size={14} />}</div>
+              <div>
+                <b>{c.name}{c.is_owner ? ' ★ owner' : ''}</b>
+                <small>
+                  {c.type === 'GROUP' ? `Nhóm${c.member_names.length ? ` · ${c.member_names.length} thành viên đã chat` : ''}` : 'Account riêng'}
+                  {' · '}{c.message_count} tin{c.last_sender ? ` · gần nhất: ${c.last_sender}` : ''}
+                </small>
+              </div>
+              <button className={`btn btn-sm ${targetChat === c.chat_id ? 'btn-primary' : ''}`} onClick={() => setTargetChat(c.chat_id)}>
+                Gửi thử
+              </button>
+            </div>
+          ))
+        )}
+      </Panel>
 
       <Panel kicker="AUTOMATION" title="Lịch tự động tiếp theo" className="page-enter" >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
