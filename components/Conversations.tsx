@@ -16,6 +16,18 @@ export default function ConversationsTab({ conversations, notify }: Props) {
   const qc = useQueryClient()
   const [q, setQ] = useState('')
   const [type, setType] = useState<'all' | 'text' | 'photo'>('all')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refreshAll = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await qc.refetchQueries({ queryKey: ['overview'], type: 'active' })
+      notify('ok', 'Đã làm mới hội thoại ✓')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -48,7 +60,7 @@ export default function ConversationsTab({ conversations, notify }: Props) {
         </div>
       </div>
 
-      <Panel kicker="MESSAGING / LIVE" title={`Hội thoại (${filtered.length})`} right={<button className="btn btn-sm btn-ghost" onClick={() => qc.refetchQueries({ queryKey: ['overview'] })}><RotateCcw size={13} /> Làm mới</button>}>
+      <Panel kicker="MESSAGING / LIVE" title={`Hội thoại (${filtered.length})`} right={<button className="btn btn-sm btn-ghost" onClick={refreshAll} disabled={refreshing}>{refreshing ? <span className="spinner" /> : <RotateCcw size={13} />} Làm mới</button>}>
         {filtered.length === 0 ? (
           <Empty text={conversations.length === 0 ? 'Chưa có hội thoại nào — gửi tin cho bot là xuất hiện ở đây.' : 'Không tìm thấy kết quả phù hợp.'} />
         ) : (

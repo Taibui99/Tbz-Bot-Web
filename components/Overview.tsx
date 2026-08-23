@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Activity, Bell, Bot, CloudSun, MessageSquare, Mic, RefreshCw, Send, Settings2, Timer, Trash2, Users, Wifi, Zap } from 'lucide-react'
+import { Activity, Bell, Bot, CloudSun, MessageSquare, Mic, RefreshCw, Send, Settings2, Smile, Timer, Trash2, Users, Wifi, Zap } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/client'
 import type { ChatInfo, Overview, TestSendResponse } from '@/lib/types'
@@ -73,11 +73,34 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
     onError: (e) => notify('err', `Lỗi gửi voice: ${String(e)}`),
   })
 
+  const stickerSend = useMutation({
+    mutationFn: () => api<TestSendResponse>('/api/test-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'sticker', chat_id: targetChat || undefined }) }),
+    onSuccess: (d) => notify(d.ok ? 'ok' : 'err', d.ok ? `Đã gửi sticker thử ✓ (${(d as { sticker_id?: string }).sticker_id ?? ''})` : `Sticker thất bại: ${d.error ?? 'lỗi không rõ'}`),
+    onError: (e) => notify('err', `Lỗi gửi sticker: ${String(e)}`),
+  })
+
   const resetOwner = useMutation({
     mutationFn: () => api<{ had_session?: boolean }>('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: settings?.owner_chat_id ?? '' }) }),
     onSuccess: (d) => { notify('ok', d.had_session ? 'Đã xoá ngữ cảnh của chủ bot' : 'Chủ bot chưa có phiên nào để xoá'); qc.invalidateQueries({ queryKey: ['overview'] }) },
     onError: (e) => notify('err', `Lỗi reset: ${String(e)}`),
   })
+
+  // Nút làm mới: nạp lại tổng quan + sổ địa chỉ, icon quay tới khi xong để
+  // người dùng thấy nút có phản hồi (trước đây bấm vào chẳng có gì thay đổi).
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshAll = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['overview'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['chats'], type: 'active' }),
+      ])
+      notify('ok', 'Đã làm mới dữ liệu ✓')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const scheduleTime = settings?.morning_greeting.time ?? '06:00'
   const morningOn = settings?.morning_greeting.enabled ?? false
@@ -133,6 +156,10 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
               <button className="btn" onClick={() => voiceSend.mutate()} disabled={voiceSend.isPending || !testText.trim() || !targetChat}>
                 {voiceSend.isPending ? <span className="spinner" /> : <Mic size={14} />}
                 Voice
+              </button>
+              <button className="btn" onClick={() => stickerSend.mutate()} disabled={stickerSend.isPending || !targetChat} title="Gửi 1 sticker ngẫu nhiên còn hoạt động">
+                {stickerSend.isPending ? <span className="spinner" /> : <Smile size={14} />}
+                Sticker
               </button>
             </div>
           </div>
@@ -207,8 +234,8 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
             <button className="btn btn-sm" onClick={() => onNavigate('scheduler')}>
               <Zap size={13} /> Chỉnh scheduler
             </button>
-            <button className="icon-btn" onClick={() => qc.refetchQueries({ queryKey: ['overview'] })} aria-label="Làm mới">
-              <RefreshCw size={14} />
+            <button className="icon-btn" onClick={refreshAll} disabled={refreshing} aria-label="Làm mới" title="Làm mới dữ liệu">
+              {refreshing ? <span className="spinner" /> : <RefreshCw size={14} />}
             </button>
           </div>
         </div>
