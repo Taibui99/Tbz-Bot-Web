@@ -12,18 +12,30 @@ type Props = {
   notify: (k: ToastKind, t: string) => void
 }
 
-type Draft = { morning_enabled: boolean; morning_time: string; schedule: Schedule }
+type Draft = {
+  morning_enabled: boolean
+  morning_time: string
+  morning_text: string
+  schedule: Schedule
+}
+
+const DEFAULT_MORNING_TEXT =
+  '☀️ Chào buổi sáng! Hôm nay là {weekday}, {date}.\nThời tiết ở {location} hiện tại: {weather}.\nChúc bro 1 ngày học tập hiệu quả! 📚'
 
 export default function SchedulerTab({ settings, notify }: Props) {
   const qc = useQueryClient()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [importText, setImportText] = useState('')
 
+  // Lấy draft từ settings mới KHI CHƯA có draft (lần đầu / sau khi lưu xong và
+  // draft được đặt null). Nhờ vậy sau lưu, form hiện lại đúng dữ liệu server
+  // vừa nhận (đã refresh), KHÔNG tự reset về giờ mặc định.
   useEffect(() => {
     if (draft === null && settings) {
       setDraft({
         morning_enabled: settings.morning_greeting.enabled,
         morning_time: settings.morning_greeting.time,
+        morning_text: settings.morning_greeting.text ?? DEFAULT_MORNING_TEXT,
         schedule: { ...EMPTY_SCHEDULE(), ...settings.schedule },
       })
     }
@@ -36,14 +48,20 @@ export default function SchedulerTab({ settings, notify }: Props) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          morning_greeting: { enabled: draft.morning_enabled, time: draft.morning_time },
+          morning_greeting: {
+            enabled: draft.morning_enabled,
+            time: draft.morning_time,
+            text: draft.morning_text,
+          },
           schedule: draft.schedule,
         }),
       })
     },
     onSuccess: () => {
       notify('ok', 'Đã lưu scheduler vào bot ✓')
-      setDraft(null)
+      // Cập nhật ngay cache để form giữ nguyên dữ liệu user vừa nhập, rồi
+      // mới refetch từ server - tránh hiện tượng form "reset" về mặc định
+      // do setDraft(null) + settings chưa kịp refresh.
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
     onError: (e) => notify('err', `Lỗi lưu: ${String(e)}`),
@@ -128,6 +146,18 @@ export default function SchedulerTab({ settings, notify }: Props) {
           </label>
           <b>{draft.morning_enabled ? 'Bot sẽ chào buổi sáng & báo thời tiết' : 'Tắt chào buổi sáng'}</b>
           <input className="input" style={{ width: 110 }} type="time" value={draft.morning_time} onChange={(e) => setDraft({ ...draft, morning_time: e.target.value })} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
+            Nội dung tin nhắn (sửa thoải mái — giữ các mã {`{weekday}`} {`{date}`} {`{weather}`} {`{location}`} {`{time}`} để bot điền tự động)
+          </label>
+          <textarea
+            className="input"
+            style={{ width: '100%', minHeight: 90, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+            value={draft.morning_text}
+            onChange={(e) => setDraft({ ...draft, morning_text: e.target.value })}
+            placeholder="☀️ Chào buổi sáng! Hôm nay là {weekday}, {date}. Thời tiết ở {location}: {weather}. Chúc bro 1 ngày tốt lành! 📚"
+          />
         </div>
       </Panel>
 

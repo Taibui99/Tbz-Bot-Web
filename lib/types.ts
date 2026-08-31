@@ -14,7 +14,7 @@ export type Status = {
 export type Period = { start: string; end: string; subject: string }
 export type Schedule = Record<string, Period[]>
 
-export type MorningGreeting = { enabled: boolean; time: string }
+export type MorningGreeting = { enabled: boolean; time: string; text?: string }
 export type Location = { name: string; lat: number | null; lon: number | null }
 
 export type Sticker = {
