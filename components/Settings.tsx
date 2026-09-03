@@ -49,7 +49,8 @@ export default function SettingsTab({ settings, notify }: Props) {
     },
     onSuccess: () => {
       notify('ok', 'Đã lưu cài đặt ✓')
-      setDraft(null)
+      // KHÔNG setDraft(null): giữ nguyên dữ liệu user vừa nhập để form không bị
+      // reset trong khi refetch overview. Chỉ cần invalidate để cập nhật cache.
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
     onError: (e) => notify('err', `Lỗi lưu: ${String(e)}`),

@@ -47,7 +47,8 @@ export default function StickersTab({ settings, notify }: Props) {
     },
     onSuccess: () => {
       notify('ok', 'Đã lưu thư viện sticker vào bot ✓')
-      setDraft(null)
+      // KHÔNG setDraft(null): giữ nguyên dữ liệu user vừa nhập để form không bị
+      // reset trong khi refetch overview (giống pattern đã fix ở Scheduler).
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
     onError: (e) => notify('err', `Lỗi lưu: ${String(e)}`),
