@@ -1054,7 +1054,7 @@ select {
 
 /* Panel xếp CHỒNG, ẩn bằng visibility (không display:none):
    mọi panel được layout đúng 1 lần lúc mount; đổi tab chỉ flip
-   visibility/opacity/transform trên compositor → không re-layout cây lớn
+   visibility/opacity trên compositor → không re-layout cây lớn
    (chính là thứ làm tab Gửi tin / Lịch bị giật). */
 .m-tabpage {
   position: absolute;
@@ -1067,9 +1067,8 @@ select {
   transform: translateY(12px);
   contain: layout paint style;
   transition:
-    opacity 0.22s ease,
-    transform 0.22s ease,
-    visibility 0s linear 0.22s;
+    opacity 0.16s ease,
+    visibility 0s linear 0.16s;
 }
 .m-tabpage.active {
   position: relative;
@@ -1077,7 +1076,20 @@ select {
   opacity: 1;
   pointer-events: auto;
   transform: none;
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  /* Entry: keyframe ở CHÍNH panel → chạy lại đáng tin cậy mỗi lần đổi tab
+     (không như card bị gián đoạn qua display:none). Chỉ transform/opacity. */
+  animation: m-tabfade 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: none;
+}
+@keyframes m-tabfade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- Hiệu ứng đẹp nhưng chỉ dùng transform/opacity ---------- */
@@ -1238,7 +1250,8 @@ select {
   .m-now-ring.live::after {
     animation: none;
   }
-  .m-card-list > * {
+  .m-tabpage.active,
+  .m-tabpage.active .m-card-list > * {
     animation: none;
   }
   .m-tab-thumb,
