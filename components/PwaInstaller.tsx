@@ -107,7 +107,7 @@ export default function PwaInstaller() {
             initial={{ y: 320 }}
             animate={{ y: 0 }}
             exit={{ y: 320 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             <div className="m-pwa-grab" />
             <button className="m-pwa-close" onClick={dismiss} aria-label="Đóng">
