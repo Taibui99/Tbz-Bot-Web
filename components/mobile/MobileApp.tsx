@@ -2,25 +2,28 @@
 
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarDays, Send, SlidersHorizontal, HeartPulse } from 'lucide-react'
+import { CalendarClock, CalendarDays, Send, SlidersHorizontal, HeartPulse } from 'lucide-react'
 import type { Overview } from '@/lib/types'
 import type { ToastKind } from '@/components/ui'
+import PwaInstaller from '@/components/PwaInstaller'
 import TodayTab from './TodayTab'
 import ModeTab from './ModeTab'
 import SendTab from './SendTab'
 import StatusTab from './StatusTab'
+import SchedulerTab from './SchedulerTab'
 
 type Props = {
   overview: Overview | undefined
   notify: (k: ToastKind, t: string) => void
 }
 
-type TabId = 'today' | 'mode' | 'send' | 'status'
+type TabId = 'today' | 'mode' | 'send' | 'scheduler' | 'status'
 
 const TABS: { id: TabId; label: string; Icon: typeof Send }[] = [
   { id: 'today', label: 'Hôm nay', Icon: CalendarDays },
   { id: 'mode', label: 'Chế độ', Icon: SlidersHorizontal },
   { id: 'send', label: 'Gửi tin', Icon: Send },
+  { id: 'scheduler', label: 'Lịch', Icon: CalendarClock },
   { id: 'status', label: 'Trạng thái', Icon: HeartPulse },
 ]
 
@@ -38,6 +41,8 @@ export default function MobileApp({ overview, notify }: Props) {
         return <ModeTab notify={notify} />
       case 'send':
         return <SendTab notify={notify} />
+      case 'scheduler':
+        return <SchedulerTab settings={settings} notify={notify} />
       case 'status':
         return <StatusTab overview={overview} status={status} settings={settings} />
     }
@@ -84,6 +89,8 @@ export default function MobileApp({ overview, notify }: Props) {
           </button>
         ))}
       </nav>
+
+      <PwaInstaller />
     </div>
   )
 }

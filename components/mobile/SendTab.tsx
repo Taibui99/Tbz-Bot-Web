@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ImagePlus, Mic, Send, Smile } from 'lucide-react'
 import { api } from '@/lib/client'
-import type { ChatInfo, TestSendResponse } from '@/lib/types'
+import type { BotConfig, ChatInfo, TestSendResponse } from '@/lib/types'
 import type { ToastKind } from '@/components/ui'
 
 type Props = {
@@ -12,6 +12,11 @@ type Props = {
 }
 
 type Kind = 'text' | 'voice' | 'sticker' | 'image'
+
+const EMOJI: Record<string, string> = {
+  vui: '😄', haha: '🤣', buon: '😢', yeu: '🥰', ghet: '😤', tuc: '😠', chao: '👋', bye: '🙋',
+  woa: '😮', camon: '🙏', sinh_nhat: '🎂', meme: '🤡', chan: '😑', buon_ngu: '🥱', nghi_ngo: '🤨', dong_y: '👍',
+}
 
 export default function SendTab({ notify }: Props) {
   const chatsQuery = useQuery({
@@ -21,9 +26,21 @@ export default function SendTab({ notify }: Props) {
   })
   const chats = useMemo(() => chatsQuery.data?.chats ?? [], [chatsQuery.data])
 
+  const configQuery = useQuery<BotConfig>({
+    queryKey: ['config'],
+    queryFn: () => api<BotConfig>('/api/config'),
+    refetchInterval: 60_000,
+  })
+  const moods = useMemo(() => configQuery.data?.sticker_moods ?? [], [configQuery.data])
+
   const [target, setTarget] = useState('')
   const [text, setText] = useState('')
+  const [mood, setMood] = useState<string>('')
   const [busy, setBusy] = useState<Kind | null>(null)
+
+  useEffect(() => {
+    if (!mood && moods.length) setMood(moods[0])
+  }, [moods, mood])
 
   useEffect(() => {
     if (!target && chats.length) {
@@ -51,7 +68,7 @@ export default function SendTab({ notify }: Props) {
     try {
       const body =
         kind === 'sticker'
-          ? { type: 'sticker', chat_id }
+          ? { type: 'sticker', chat_id, mood: mood || moods[0] || 'vui' }
           : { type: kind, text: text.trim(), chat_id }
       const d = await api<TestSendResponse>('/api/test-send', {
         method: 'POST',
@@ -120,13 +137,31 @@ export default function SendTab({ notify }: Props) {
             <span>Ảnh AI</span>
           </button>
         </div>
+
+        {moods.length > 0 && (
+          <div className="m-field" style={{ marginTop: 14, marginBottom: 0 }}>
+            <span className="m-field-label">Mood sticker gửi kèm</span>
+            <div className="m-chip-row">
+              {moods.map((m) => (
+                <button
+                  key={m}
+                  className={`m-chip ${mood === m ? 'on' : ''}`}
+                  onClick={() => setMood(m)}
+                  aria-pressed={mood === m}
+                >
+                  {EMOJI[m] ?? '🏷️'} {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="m-note">
         <span>💡</span>
         <p>
-          Dùng <b>Gửi tin</b> để test voice, sticker hay gửi lệnh nhanh tới từng chat ngay từ
-          điện thoại — giống nút thử trên dashboard máy tính.
+          Dùng <b>Gửi tin</b> để test voice, ảnh AI hay gửi sticker theo đúng mood đã lưu trong
+          thư viện — giống nút thử trên dashboard máy tính.
         </p>
       </section>
     </div>
