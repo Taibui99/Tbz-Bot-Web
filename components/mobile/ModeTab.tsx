@@ -52,13 +52,14 @@ export default function ModeTab({ notify }: Props) {
   })
 
   const current = options.find((o) => o.id === (mode ?? config.data?.mode)) ?? null
+  const HeroIcon = current ? (ICONS[current.id] ?? Zap) : Zap
 
   return (
     <div className="m-card-list">
       <section className="m-mode-hero">
         <div className="m-mode-hero-top">
           <span className="m-mode-icon">
-            {current ? (ICONS[current.id] ?? Zap)({ size: 24 }) : <Zap size={24} />}
+            <HeroIcon size={24} />
           </span>
           <div>
             <span className="m-kicker">CHẾ ĐỘ HIỆN TẠI</span>

@@ -1052,7 +1052,8 @@ select {
 }
 
 .m-tabpage {
-  will-change: transform;
+  /* framer-motion tự đặt transform/bộ compositing trong lúc transition;
+     KHÔNG giữ will-change vĩnh viễn để tránh tốn layer trên GPU yếu. */
 }
 
 .m-card-list {
@@ -1067,7 +1068,7 @@ select {
   border: 1px solid rgba(25, 35, 70, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
   padding: 18px 16px;
-  box-shadow: 0 14px 34px rgba(76, 90, 168, 0.14);
+  box-shadow: 0 4px 14px rgba(76, 90, 168, 0.08);
 }
 .m-card-head {
   margin-bottom: 12px;
@@ -1231,7 +1232,7 @@ select {
   background:
     radial-gradient(360px 240px at 100% 0%, rgba(255, 255, 255, 0.25), transparent 58%),
     linear-gradient(150deg, #8b7cf6 0%, #6d5cf0 45%, #22d3ee 130%);
-  box-shadow: 0 22px 48px rgba(109, 92, 240, 0.4);
+  box-shadow: 0 8px 22px rgba(109, 92, 240, 0.32);
 }
 .m-hero-grid {
   display: flex;
@@ -1417,7 +1418,7 @@ select {
   background:
     radial-gradient(380px 240px at 100% 0%, rgba(255, 255, 255, 0.28), transparent 58%),
     linear-gradient(150deg, #22d3ee 0%, #38bdf8 48%, #8b7cf6 135%);
-  box-shadow: 0 22px 48px rgba(56, 189, 248, 0.4);
+  box-shadow: 0 8px 22px rgba(56, 189, 248, 0.32);
 }
 .m-mode-hero-top {
   display: flex;
