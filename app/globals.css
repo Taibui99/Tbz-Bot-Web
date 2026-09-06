@@ -1052,8 +1052,23 @@ select {
 }
 
 .m-tabpage {
-  /* framer-motion tự đặt transform/bộ compositing trong lúc transition;
-     KHÔNG giữ will-change vĩnh viễn để tránh tốn layer trên GPU yếu. */
+  display: none;
+}
+.m-tabpage.active {
+  display: block;
+  /* Chỉ fade opacity + transform ngắn — cheap trên GPU, panel đã mount sẵn
+     nên chuyển tab không re-render nội dung. */
+  animation: m-tabfade 0.16s ease-out;
+}
+@keyframes m-tabfade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .m-card-list {

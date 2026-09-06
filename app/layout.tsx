@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Providers } from './providers'
 import SwRegister from '@/components/SwRegister'
+import PwaInstaller from '@/components/PwaInstaller'
 
 export const metadata: Metadata = {
   title: 'TBZ-BOT // Control Center',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <Providers>{children}</Providers>
         <SwRegister />
+        <PwaInstaller />
       </body>
     </html>
   )

@@ -1,11 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarClock, CalendarDays, Send, SlidersHorizontal, HeartPulse } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { Overview } from '@/lib/types'
 import type { ToastKind } from '@/components/ui'
-import PwaInstaller from '@/components/PwaInstaller'
 import TodayTab from './TodayTab'
 import ModeTab from './ModeTab'
 import SendTab from './SendTab'
@@ -33,20 +32,18 @@ export default function MobileApp({ overview, notify }: Props) {
   const settings = overview?.settings ?? null
   const status = overview?.status ?? null
 
-  const content = useMemo(() => {
-    switch (tab) {
-      case 'today':
-        return <TodayTab overview={overview} settings={settings} status={status} notify={notify} onGoMode={() => setTab('mode')} />
-      case 'mode':
-        return <ModeTab notify={notify} />
-      case 'send':
-        return <SendTab notify={notify} />
-      case 'scheduler':
-        return <SchedulerTab settings={settings} notify={notify} />
-      case 'status':
-        return <StatusTab overview={overview} status={status} settings={settings} />
-    }
-  }, [tab, overview, settings, status, notify])
+  // Mọi panel MOUNT SẴN một lần: chuyển tab chỉ đổi opacity (CSS), không
+  // re-mount, không chờ exit rồi enter → cử động mượt ngay cả trên GPU yếu.
+  const panels = useMemo<Record<TabId, ReactNode>>(
+    () => ({
+      today: <TodayTab overview={overview} settings={settings} status={status} notify={notify} onGoMode={() => setTab('mode')} />,
+      mode: <ModeTab notify={notify} />,
+      send: <SendTab notify={notify} />,
+      scheduler: <SchedulerTab settings={settings} notify={notify} />,
+      status: <StatusTab overview={overview} status={status} settings={settings} />,
+    }),
+    [overview, settings, status, notify],
+  )
 
   const title = tab === 'today' ? 'Hôm nay' : TABS.find((t) => t.id === tab)?.label ?? ''
   const dateLabel = new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -62,18 +59,11 @@ export default function MobileApp({ overview, notify }: Props) {
       </header>
 
       <main className="m-body">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            className="m-tabpage"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            {content}
-          </motion.div>
-        </AnimatePresence>
+        {TABS.map(({ id }) => (
+          <div key={id} className={`m-tabpage ${tab === id ? 'active' : ''}`} aria-hidden={tab !== id}>
+            {panels[id]}
+          </div>
+        ))}
       </main>
 
       <nav className="m-tabbar" aria-label="Điều hướng nhanh">
@@ -89,8 +79,6 @@ export default function MobileApp({ overview, notify }: Props) {
           </button>
         ))}
       </nav>
-
-      <PwaInstaller />
     </div>
   )
 }

@@ -9,7 +9,8 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-const LS_KEY = 'tbz_pwa_dismissed'
+const INSTALLED_KEY = 'tbz_pwa_installed'
+const DISMISS_KEY = 'tbz_pwa_dismissed'
 
 export default function PwaInstaller() {
   const [show, setShow] = useState(false)
@@ -17,8 +18,23 @@ export default function PwaInstaller() {
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
-    if (window.matchMedia?.('(display-mode: standalone)').matches) return
-    if (localStorage.getItem(LS_KEY)) return
+    // Đã cài (standalone hay đã cài 1 lần trước) → không hỏi nữa.
+    try {
+      if (window.matchMedia?.('(display-mode: standalone)').matches) {
+        localStorage.setItem(INSTALLED_KEY, '1')
+        return
+      }
+      if (localStorage.getItem(INSTALLED_KEY)) return
+    } catch {
+      /* môi trường hạn chế localStorage — coi như chưa cài */
+    }
+
+    // "Để sau" chỉ bỏ qua trong PHIÊN này: mở lại web (dù chưa cài) sẽ hỏi lại.
+    try {
+      if (sessionStorage.getItem(DISMISS_KEY)) return
+    } catch {
+      /* không sessionStorage được thì cứ hỏi */
+    }
 
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
     setIsIOS(ios)
@@ -28,31 +44,51 @@ export default function PwaInstaller() {
       setDeferred(e as BeforeInstallPromptEvent)
       setShow(true)
     }
+    const onInstalled = () => {
+      try {
+        localStorage.setItem(INSTALLED_KEY, '1')
+      } catch {
+        /* ignore */
+      }
+      setShow(false)
+    }
     window.addEventListener('beforeinstallprompt', onPrompt)
+    window.addEventListener('appinstalled', onInstalled)
 
-    // Chromium bắn beforeinstallprompt; nếu sau 4s chưa có (iOS/máy không đủ
-    // điều kiện) thì hiện bảng hướng dẫn thủ công.
-    const timer = window.setTimeout(() => {
-      setShow(true)
-    }, 4000)
+    // Browser có nút cài native (Android/Desktop Chrome) hoặc iOS (cài tay)
+    // đều cần sheet — hiện sau 3s kể cả khi beforeinstallprompt không bắn.
+    const timer = window.setTimeout(() => setShow(true), 3000)
 
     return () => {
       window.clearTimeout(timer)
       window.removeEventListener('beforeinstallprompt', onPrompt)
+      window.removeEventListener('appinstalled', onInstalled)
     }
   }, [])
 
+  const canInstall = deferred || isIOS
+  if (!show || !canInstall) return null
+
   const dismiss = () => {
-    localStorage.setItem(LS_KEY, '1')
+    try {
+      sessionStorage.setItem(DISMISS_KEY, '1')
+    } catch {
+      /* ignore */
+    }
     setShow(false)
   }
 
   const install = async () => {
-    if (deferred) {
-      deferred.prompt()
-      await deferred.userChoice.catch(() => {})
+    try {
+      if (deferred) {
+        // Bắn dialog cài đặt native của trình duyệt
+        deferred.prompt()
+        await deferred.userChoice.catch(() => {})
+      }
+      localStorage.setItem(INSTALLED_KEY, '1')
+    } catch {
+      /* ignore */
     }
-    localStorage.setItem(LS_KEY, '1')
     setShow(false)
   }
 
@@ -106,7 +142,7 @@ export default function PwaInstaller() {
             )}
 
             <button className="m-pwa-later" onClick={dismiss}>
-              Để sau
+              Thôi, để sau
             </button>
           </motion.div>
         </motion.div>
