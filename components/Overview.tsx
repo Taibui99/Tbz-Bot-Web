@@ -104,6 +104,7 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
 
   const scheduleTime = settings?.morning_greeting.time ?? '06:00'
   const morningOn = settings?.morning_greeting.enabled ?? false
+  const targetCount = settings?.schedule_targets?.enabled ? (settings.schedule_targets.chat_ids?.length ?? 0) + 1 : 1
 
   return (
     <>
@@ -123,7 +124,7 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
       <div className="grid grid-2" style={{ marginTop: 16 }}>
         <Panel kicker="INFRASTRUCTURE" title="Trạng thái dịch vụ" right={isLoading ? <div className="spinner" /> : <span className="pill" style={{ color: 'var(--green)' }}>OK</span>}>
           <ServiceRow icon={<Bot size={14} />} name="Zalo Gateway" meta={status?.bot_running ? 'Đang kết nối, long-polling' : 'Đã ngắt'} ok={!!status?.bot_running} />
-          <ServiceRow icon={<Bell size={14} />} name="Morning Scheduler" meta={morningOn ? `Hoạt động · ${scheduleTime}` : 'Đang tắt'} ok={morningOn} />
+          <ServiceRow icon={<Bell size={14} />} name="Morning Scheduler" meta={`${morningOn ? `Hoạt động · ${scheduleTime} · ` : 'Đang tắt'}${morningOn ? `${targetCount} nơi nhận` : ''}`} ok={morningOn} />
           <ServiceRow icon={<CloudSun size={14} />} name="Weather" meta={settings?.location.name ? `Đã cấu hình · ${settings.location.name}` : 'Chưa cấu hình vị trí'} ok={!!settings?.location.name} />
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>

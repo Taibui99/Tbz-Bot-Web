@@ -17,6 +17,11 @@ export type Schedule = Record<string, Period[]>
 export type MorningGreeting = { enabled: boolean; time: string; text?: string }
 export type Location = { name: string; lat: number | null; lon: number | null }
 
+export type ScheduleTargets = {
+  enabled: boolean
+  chat_ids: string[]
+}
+
 export type Sticker = {
   mood: string
   sticker_id: string
@@ -28,6 +33,7 @@ export type Settings = {
   morning_greeting: MorningGreeting
   location: Location
   schedule: Schedule
+  schedule_targets?: ScheduleTargets
   sticker_library: Record<string, { sticker_id: string; verified_code: string }>
 }
 

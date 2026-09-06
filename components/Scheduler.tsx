@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, ClipboardCopy, Plus, Save, Trash2 } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Check, ClipboardCopy, Plus, Save, Trash2, Users } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/client'
-import type { Period, Schedule, Settings } from '@/lib/types'
+import type { ChatInfo, Period, Schedule, Settings } from '@/lib/types'
 import { DAYS, EMPTY_SCHEDULE, Empty, Panel, type ToastKind } from '@/components/ui'
 
 type Props = {
@@ -17,6 +17,8 @@ type Draft = {
   morning_time: string
   morning_text: string
   schedule: Schedule
+  targets_enabled: boolean
+  target_ids: string[]
 }
 
 const DEFAULT_MORNING_TEXT =
@@ -27,16 +29,27 @@ export default function SchedulerTab({ settings, notify }: Props) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [importText, setImportText] = useState('')
 
+  // Sổ địa chỉ chat để tick chọn người nhận thông báo tự động
+  const chatsQuery = useQuery({
+    queryKey: ['chats'],
+    queryFn: () => api<{ chats: ChatInfo[] }>('/api/chats'),
+    refetchInterval: 60_000,
+  })
+  const chats = chatsQuery.data?.chats ?? []
+
   // Lấy draft từ settings mới KHI CHƯA có draft (lần đầu / sau khi lưu xong và
   // draft được đặt null). Nhờ vậy sau lưu, form hiện lại đúng dữ liệu server
   // vừa nhận (đã refresh), KHÔNG tự reset về giờ mặc định.
   useEffect(() => {
     if (draft === null && settings) {
+      const targets = settings.schedule_targets ?? { enabled: false, chat_ids: [] }
       setDraft({
         morning_enabled: settings.morning_greeting.enabled,
         morning_time: settings.morning_greeting.time,
         morning_text: settings.morning_greeting.text ?? DEFAULT_MORNING_TEXT,
         schedule: { ...EMPTY_SCHEDULE(), ...settings.schedule },
+        targets_enabled: !!targets.enabled,
+        target_ids: Array.isArray(targets.chat_ids) ? [...targets.chat_ids] : [],
       })
     }
   }, [settings, draft])
@@ -54,6 +67,10 @@ export default function SchedulerTab({ settings, notify }: Props) {
             text: draft.morning_text,
           },
           schedule: draft.schedule,
+          schedule_targets: {
+            enabled: draft.targets_enabled,
+            chat_ids: draft.target_ids,
+          },
         }),
       })
     },
@@ -160,6 +177,61 @@ export default function SchedulerTab({ settings, notify }: Props) {
           />
         </div>
       </Panel>
+
+      <div style={{ marginTop: 16 }}>
+        <Panel
+          kicker="RECIPIENTS"
+          title="Người nhận thông báo"
+          right={<span className={`pill ${draft.targets_enabled ? 'online' : 'offline'}`}>{draft.targets_enabled ? 'GỬI NHIỀU NƠI' : 'CHỈ CHỦ BOT'}</span>}
+        >
+          <div className="toggle-row">
+            <label className="switch">
+              <input type="checkbox" checked={draft.targets_enabled} onChange={(e) => setDraft({ ...draft, targets_enabled: e.target.checked })} />
+              <span className="track" />
+            </label>
+            <b>{draft.targets_enabled ? 'Gửi chào sáng & báo tiết cho nhiều nơi' : 'Chỉ gửi cho chủ bot'}</b>
+          </div>
+          {draft.targets_enabled && (
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
+                Tick các nơi nhận (chủ bot luôn nhận dù không tick) — chat riêng lẫn nhóm đều được:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                {chats.length === 0 && (
+                  <div className="empty">Chưa có ai nhắn bot — sổ địa chỉ sẽ tự đầy khi có người chat.</div>
+                )}
+                {chats.map((c) => {
+                  const checked = draft.target_ids.includes(c.chat_id)
+                  return (
+                    <label key={c.chat_id} className="toggle-row" style={{ cursor: 'pointer', padding: '4px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked || c.is_owner}
+                        disabled={c.is_owner}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            if (!prev) return prev
+                            const set = new Set(prev.target_ids)
+                            if (e.target.checked) set.add(c.chat_id)
+                            else set.delete(c.chat_id)
+                            return { ...prev, target_ids: [...set] }
+                          })
+                        }
+                      />
+                      <span className="service-icon" style={{ margin: '0 2px' }}>{c.type === 'GROUP' ? <Users size={14} /> : null}</span>
+                      <span style={{ flex: 1, fontSize: 13 }}>
+                        {c.type === 'GROUP' ? 'Nhóm: ' : 'Chat: '}
+                        <b>{c.name}</b>
+                        <small style={{ color: 'var(--text-3)' }}>{c.is_owner ? ' · chủ bot (luôn nhận)' : ` · ${c.message_count} tin`}</small>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </Panel>
+      </div>
 
       <div style={{ marginTop: 16 }}>
         <Panel kicker="WEEKLY SCHEDULE" title="Thời khóa biểu" right={<span className="pill">{DAYS.reduce((n, [d]) => n + (draft.schedule[d]?.length ?? 0), 0)} tiết</span>}>
