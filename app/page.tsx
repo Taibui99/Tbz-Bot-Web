@@ -16,8 +16,10 @@ import {
   Sticker,
 } from 'lucide-react'
 import { api, ApiAuthError, setToken } from '@/lib/client'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { Overview } from '@/lib/types'
 import { ToastHost, type Toast, type ToastKind } from '@/components/ui'
+import MobileApp from '@/components/mobile/MobileApp'
 import OverviewTab from '@/components/Overview'
 import ConversationsTab from '@/components/Conversations'
 import LogsTab from '@/components/Logs'
@@ -52,6 +54,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false)
   const [authFailed, setAuthFailed] = useState(false)
   const toastId = useRef(0)
+  const { isMobile, ready } = useIsMobile()
 
   const notify = useCallback((kind: ToastKind, text: string) => {
     const id = ++toastId.current
@@ -89,6 +92,22 @@ export default function Home() {
 
   if (authFailed) {
     return <LoginScreen notify={notify} onSuccess={() => { setAuthFailed(false); qc.invalidateQueries({ queryKey: ['overview'] }) }} />
+  }
+
+  if (ready && isMobile) {
+    return (
+      <>
+        {overview.isLoading && !overview.data ? (
+          <div className="m-app" style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <div className="spinner" />
+            <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Đang đồng bộ dữ liệu từ bot…</span>
+          </div>
+        ) : (
+          <MobileApp overview={overview.data} notify={notify} />
+        )}
+        <ToastHost toasts={toasts} />
+      </>
+    )
   }
 
   const current = TAB_TITLES[tab]

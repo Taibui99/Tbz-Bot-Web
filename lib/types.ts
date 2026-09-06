@@ -50,6 +50,12 @@ export type Conversation = {
   received_ts?: number
 }
 
+export type ModeOption = {
+  id: string
+  label: string
+  desc: string
+}
+
 export type BotConfig = {
   model: string
   voice: string
@@ -58,6 +64,8 @@ export type BotConfig = {
   sticker_count: number
   sticker_moods: string[]
   admin_enabled: boolean
+  mode: string
+  mode_options: ModeOption[]
 }
 
 export type Overview = {
