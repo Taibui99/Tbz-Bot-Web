@@ -60,7 +60,7 @@ export default function MobileApp({ overview, notify }: Props) {
 
       <main className="m-body">
         {TABS.map(({ id }) => (
-          <div key={id} className={`m-tabpage ${tab === id ? 'active' : ''}`} aria-hidden={tab !== id}>
+          <div key={id} className={`m-tabpage ${tab === id ? 'active' : ''}`} aria-hidden={tab !== id} inert={tab !== id}>
             {panels[id]}
           </div>
         ))}

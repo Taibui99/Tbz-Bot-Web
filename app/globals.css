@@ -1049,47 +1049,56 @@ select {
   overflow-y: auto;
   padding: 4px 16px calc(96px + env(safe-area-inset-bottom, 0px));
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
+/* Panel xếp CHỒNG, ẩn bằng visibility (không display:none):
+   mọi panel được layout đúng 1 lần lúc mount; đổi tab chỉ flip
+   visibility/opacity/transform trên compositor → không re-layout cây lớn
+   (chính là thứ làm tab Gửi tin / Lịch bị giật). */
 .m-tabpage {
-  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  contain: layout paint style;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    visibility 0s linear 0.22s;
 }
 .m-tabpage.active {
-  display: block;
-  /* Vuốt lên nhẹ + fade: transform/opacity nên chạy trên compositor,
-     ease-out mềm cho cảm giác "responsive" thay vì cứng nhắc. */
-  animation: m-tabfade 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes m-tabfade {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  position: relative;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
 /* ---------- Hiệu ứng đẹp nhưng chỉ dùng transform/opacity ---------- */
 
-/* Card xuất hiện lần lượt từng tầng (chạy lại mỗi lần chuyển tab) */
-.m-card-list > * {
+/* Card xuất hiện lần lượt từng tầng (chạy lại mỗi lần chuyển vào tab active) */
+.m-tabpage.active .m-card-list > * {
   animation: m-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
-.m-card-list > *:nth-child(1) {
+.m-tabpage.active .m-card-list > *:nth-child(1) {
   animation-delay: 0.02s;
 }
-.m-card-list > *:nth-child(2) {
+.m-tabpage.active .m-card-list > *:nth-child(2) {
   animation-delay: 0.07s;
 }
-.m-card-list > *:nth-child(3) {
+.m-tabpage.active .m-card-list > *:nth-child(3) {
   animation-delay: 0.12s;
 }
-.m-card-list > *:nth-child(4) {
+.m-tabpage.active .m-card-list > *:nth-child(4) {
   animation-delay: 0.17s;
 }
-.m-card-list > *:nth-child(5) {
+.m-tabpage.active .m-card-list > *:nth-child(5) {
   animation-delay: 0.22s;
 }
 @keyframes m-rise {
