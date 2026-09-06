@@ -1056,18 +1056,186 @@ select {
 }
 .m-tabpage.active {
   display: block;
-  /* Chỉ fade opacity + transform ngắn — cheap trên GPU, panel đã mount sẵn
-     nên chuyển tab không re-render nội dung. */
-  animation: m-tabfade 0.16s ease-out;
+  /* Vuốt lên nhẹ + fade: transform/opacity nên chạy trên compositor,
+     ease-out mềm cho cảm giác "responsive" thay vì cứng nhắc. */
+  animation: m-tabfade 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes m-tabfade {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ---------- Hiệu ứng đẹp nhưng chỉ dùng transform/opacity ---------- */
+
+/* Card xuất hiện lần lượt từng tầng (chạy lại mỗi lần chuyển tab) */
+.m-card-list > * {
+  animation: m-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.m-card-list > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.m-card-list > *:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.m-card-list > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.m-card-list > *:nth-child(4) {
+  animation-delay: 0.17s;
+}
+.m-card-list > *:nth-child(5) {
+  animation-delay: 0.22s;
+}
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Ánh sáng quét ngang trên 2 hero (transform thuần, pointer-events none) */
+.m-hero,
+.m-mode-hero {
+  position: relative;
+  overflow: hidden;
+}
+.m-hero::after,
+.m-mode-hero::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: -45%;
+  width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-18deg) translateX(-200%);
+  animation: m-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes m-sheen {
+  0% {
+    transform: skewX(-18deg) translateX(-200%);
+  }
+  55%,
+  100% {
+    transform: skewX(-18deg) translateX(420%);
+  }
+}
+
+/* Ripple nhịp trên chấm status */
+.m-hero-dot,
+.m-now-ring.live {
+  position: relative;
+}
+.m-hero-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: m-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.m-now-ring.live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: m-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes m-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  70%,
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Tab được chọn "nảy" icon lên */
+.m-tab.active svg {
+  animation: m-tabpop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes m-tabpop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Mode item được chọn "co vào rồi nở ra" */
+.m-mode-item.selected {
+  animation: m-select 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes m-select {
+  0% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Shimmer trên nút primary */
+.m-sendbtn.primary {
+  position: relative;
+  overflow: hidden;
+}
+.m-sendbtn.primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-150%);
+  animation: m-sheen 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Nhấn nhẹ cảm giác phản hồi (scale + mờ) */
+.m-row:active,
+.m-chip:active,
+.m-sendbtn:active,
+.m-mode-item:active,
+.m-chatrow:active {
+  transform: scale(0.97);
+}
+.m-row:active {
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-hero::after,
+  .m-mode-hero::after,
+  .m-sendbtn.primary::after,
+  .m-hero-dot::after,
+  .m-now-ring.live::after {
+    animation: none;
+  }
+  .m-card-list > * {
+    animation: none;
+  }
+  .m-tab-thumb,
+  .m-tab.active svg,
+  .m-mode-item.selected {
+    animation: none;
   }
 }
 

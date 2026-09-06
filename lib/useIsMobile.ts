@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Detect chế độ mobile (màn hình hẹp < 820px). Trả về { isMobile, ready }:
- * - ready=false trong render đầu (SSR + mount) để mobile không lướt qua desktop.
- * - isMobile=true khi viewport chuyển sang màn hình nhỏ, tự cập nhật khi xoay/xẹp.
+ * Detect chế độ mobile (màn hình hẹp < 820px). Trả về { isMobile, ready }.
+ * - ssrMobile: do server truyền từ user-agent để lần render đầu ĐÃ ĐÚNG giao
+ *   diện — tránh "nháy desktop 1s rồi nhảy qua mobile" lúc khởi động.
+ * - ready=false chỉ trong pha SSR/mount; sau đó matchMedia điều chỉnh lại thật.
  */
-export function useIsMobile(query = '(max-width: 820px)') {
+export function useIsMobile(query = '(max-width: 820px)', ssrMobile = false) {
   const [ready, setReady] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(ssrMobile)
 
   useEffect(() => {
     const mql = window.matchMedia(query)
