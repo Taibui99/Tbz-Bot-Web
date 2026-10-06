@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Bot, FlaskConical, KeyRound, RefreshCw, Send, ShieldCheck } from 'lucide-react'
 import { api, ApiAuthError, setToken } from '@/lib/client'
@@ -33,6 +33,18 @@ export default function TestMentionClient() {
   const chats = useMemo(() => chatsQuery.data?.chats ?? [], [chatsQuery.data])
   const groups = useMemo(() => chats.filter((c) => c.type === 'GROUP'), [chats])
 
+  // Nếu API báo 401 -> cần đăng nhập, hiện màn hình nhập token.
+  useEffect(() => {
+    if (chatsQuery.isError && chatsQuery.error instanceof ApiAuthError) {
+      setAuthFailed(true)
+    }
+  }, [chatsQuery.isError, chatsQuery.error])
+
+  // Tự chọn nhóm đầu tiên khi đã có dữ liệu, để nút gửi được bật.
+  useEffect(() => {
+    if (!target && groups.length) setTarget(groups[0].chat_id)
+  }, [groups, target])
+
   const retryAuth = useCallback(() => {
     setAuthFailed(false)
     chatsQuery.refetch()
@@ -48,12 +60,18 @@ export default function TestMentionClient() {
             ;(async () => {
               if (!token.trim()) return
               setAuthBusy(true)
+              setErr('')
               try {
                 setToken(token.trim())
-                setAuthFailed(false)
-                chatsQuery.refetch()
+                const res = await chatsQuery.refetch()
+                if (res.isError) {
+                  setToken('')
+                  setAuthFailed(true)
+                  setErr('Sai ADMIN_TOKEN — thử lại')
+                }
               } catch {
                 setAuthFailed(true)
+                setErr('Không kết nối được với bot')
               } finally {
                 setAuthBusy(false)
               }
@@ -76,6 +94,9 @@ export default function TestMentionClient() {
             {authBusy ? <span className="spinner" /> : <KeyRound size={15} />}
             {authBusy ? 'Đang kiểm tra…' : 'Tiếp tục'}
           </button>
+          {err && (
+            <div style={{ color: 'var(--red)', fontSize: 13, margin: 0 }}>{err}</div>
+          )}
         </form>
       </div>
     )
