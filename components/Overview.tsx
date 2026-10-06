@@ -174,6 +174,9 @@ export default function OverviewTab({ overview, isLoading, onNavigate, notify }:
             <button className="btn btn-sm" onClick={() => onNavigate('conversations')}>
               <MessageSquare size={13} /> Hội thoại
             </button>
+            <button className="btn btn-sm" onClick={() => { window.location.href = '/test-mention' }}>
+              <Zap size={13} /> Test tag @all
+            </button>
             <button className="btn btn-sm btn-danger" onClick={() => resetOwner.mutate()} disabled={resetOwner.isPending}>
               <Trash2 size={13} /> Reset ngữ cảnh
             </button>

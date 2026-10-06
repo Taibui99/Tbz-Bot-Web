@@ -161,7 +161,10 @@ export default function SendTab({ notify }: Props) {
         <span>💡</span>
         <p>
           Dùng <b>Gửi tin</b> để test voice, ảnh AI hay gửi sticker theo đúng mood đã lưu trong
-          thư viện — giống nút thử trên dashboard máy tính.
+          thư viện — giống nút thử trên dashboard máy tính.{' '}
+          <a href="/test-mention" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+            Test tag @all trên nhóm →
+          </a>
         </p>
       </section>
     </div>

@@ -82,6 +82,7 @@ export type TestSendRequest = {
   mood?: string
   sticker_id?: string
   chat_id?: string
+  mention?: 'group' | 'at_all'
 }
 
 export type TestSendResponse = {
@@ -92,6 +93,7 @@ export type TestSendResponse = {
   sticker_id?: string
   voice_url?: string
   photo_url?: string
+  sent_text?: string
   error?: string
 }
 
