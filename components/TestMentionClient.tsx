@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bot, FlaskConical, KeyRound, RefreshCw, Send, ShieldCheck } from 'lucide-react'
-import { api, ApiAuthError, setToken } from '@/lib/client'
+import { Bot, FlaskConical, RefreshCw, Send } from 'lucide-react'
+import { api } from '@/lib/client'
 import type { ChatInfo, TestSendResponse } from '@/lib/types'
 
 type Mode = 'plain' | 'group' | 'at_all'
@@ -15,9 +15,6 @@ const MODE_LABEL: Record<Mode, string> = {
 }
 
 export default function TestMentionClient() {
-  const [token, setTokenValue] = useState('')
-  const [authFailed, setAuthFailed] = useState(false)
-  const [authBusy, setAuthBusy] = useState(false)
   const [target, setTarget] = useState('')
   const [text, setText] = useState('')
   const [mode, setMode] = useState<Mode>('group')
@@ -33,81 +30,12 @@ export default function TestMentionClient() {
   const chats = useMemo(() => chatsQuery.data?.chats ?? [], [chatsQuery.data])
   const groups = useMemo(() => chats.filter((c) => c.type === 'GROUP'), [chats])
 
-  // Nếu API báo 401 -> cần đăng nhập, hiện màn hình nhập token.
-  useEffect(() => {
-    if (chatsQuery.isError && chatsQuery.error instanceof ApiAuthError) {
-      setAuthFailed(true)
-    }
-  }, [chatsQuery.isError, chatsQuery.error])
-
-  // Tự chọn nhóm đầu tiên khi đã có dữ liệu, để nút gửi được bật.
   useEffect(() => {
     if (!target && groups.length) setTarget(groups[0].chat_id)
   }, [groups, target])
 
-  const retryAuth = useCallback(() => {
-    setAuthFailed(false)
-    chatsQuery.refetch()
-  }, [chatsQuery])
-
-  if (authFailed) {
-    return (
-      <div className="login-wrap">
-        <form
-          className="login-card"
-          onSubmit={(e) => {
-            e.preventDefault()
-            ;(async () => {
-              if (!token.trim()) return
-              setAuthBusy(true)
-              setErr('')
-              try {
-                setToken(token.trim())
-                const res = await chatsQuery.refetch()
-                if (res.isError) {
-                  setToken('')
-                  setAuthFailed(true)
-                  setErr('Sai ADMIN_TOKEN — thử lại')
-                }
-              } catch {
-                setAuthFailed(true)
-                setErr('Không kết nối được với bot')
-              } finally {
-                setAuthBusy(false)
-              }
-            })()
-          }}
-        >
-          <div className="rail-logo" style={{ margin: 0 }}>
-            <ShieldCheck size={24} />
-          </div>
-          <h1>Đăng nhập quản trị</h1>
-          <p style={{ color: 'var(--text-2)', margin: 0, fontSize: 13 }}>
-            Web đã bật ADMIN_TOKEN. Nhập token (giống biến môi trường{' '}
-            <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: 6 }}>ADMIN_TOKEN</code>) để dùng trang test.
-          </p>
-          <div className="field">
-            <span>ADMIN_TOKEN</span>
-            <input className="input" type="password" value={token} onChange={(e) => setTokenValue(e.target.value)} placeholder="••••••••" autoFocus />
-          </div>
-          <button className="btn btn-primary" disabled={authBusy || !token.trim()}>
-            {authBusy ? <span className="spinner" /> : <KeyRound size={15} />}
-            {authBusy ? 'Đang kiểm tra…' : 'Tiếp tục'}
-          </button>
-          {err && (
-            <div style={{ color: 'var(--red)', fontSize: 13, margin: 0 }}>{err}</div>
-          )}
-        </form>
-      </div>
-    )
-  }
-
   const sendOne = async (m: Mode) => {
     if (!target || !text.trim()) return
-    if (!groups.some((g) => g.chat_id === target)) {
-      setErr('Đích chọn không phải nhóm Zalo — chọn 1 nhóm trong dropdown')
-      return
-    }
     setBusy(true)
     setErr('')
     setResult(null)
@@ -119,8 +47,9 @@ export default function TestMentionClient() {
         body: JSON.stringify({ type: 'text', text: text.trim(), chat_id: target, mention }),
       })
       setResult(d)
+      if (!(d.ok ?? d.success)) setErr(d.error ?? 'lỗi không rõ')
     } catch (e) {
-      setErr(e instanceof ApiAuthError ? 'Cần đăng nhập lại' : String(e))
+      setErr(String(e))
     } finally {
       setBusy(false)
     }
@@ -150,12 +79,12 @@ export default function TestMentionClient() {
 
       <div className="login-card" style={{ maxWidth: 'none', gap: 18 }}>
         <div className="field">
-          <span>Nhóm Zalo đích</span>
+          <span>Nhóm Zalo đích ({groups.length})</span>
           <select className="select" value={target} onChange={(e) => setTarget(e.target.value)} disabled={groups.length === 0}>
             {groups.length === 0 && <option value="">(Chưa thấy nhóm nào — nhắn bot trong nhóm trước)</option>}
             {groups.map((g) => (
               <option key={g.chat_id} value={g.chat_id}>
-                {g.name} ({g.member_names.length ? `đã gặp ${g.member_names.length} thành viên` : 'no info'})
+                {g.name || g.chat_id} {g.member_names.length ? `(đã gặp ${g.member_names.length} thành viên)` : ''}
               </option>
             ))}
           </select>
@@ -195,16 +124,8 @@ export default function TestMentionClient() {
           </button>
         </div>
 
-        {chatsQuery.isError && chatsQuery.error instanceof ApiAuthError ? (
-          <div style={{ color: 'var(--red)', fontSize: 13 }}>
-            Không tải được danh sách nhóm (cần đăng nhập).{' '}
-            <button className="btn btn-sm" onClick={retryAuth}>
-              Nhập token
-            </button>
-          </div>
-        ) : null}
         {err && <div className="alert" style={{ marginBottom: 0 }}>Gửi thất bại: {err}</div>}
-        {result && (
+        {result?.ok && (
           <div
             style={{
               border: '1px solid var(--border-strong)',
